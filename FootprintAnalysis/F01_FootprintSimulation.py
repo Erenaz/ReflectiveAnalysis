@@ -259,7 +259,31 @@ def runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_model):
         print(f'CoREAS mode {CoREAS_mode} not implemented')
 
 
-def triggerAndVrmsConditions(amp_type):
+def bandwidthAndVrmsConditions(amp_type):
+    """
+    Returns bandwidths used and temerature conditions
+
+    Parameters
+    ----------
+    amp_type : string
+        100, 200, or 300: Configure existing amplifiers
+        future: Configure future detector, which used a bandpass filter
+            From here: https://github.com/nu-radio/analysis-scripts/blob/gen2-tdr-2021/gen2-tdr-2021/detsim/D01detector_sim.py
+
+    Returns
+    -------
+    noise_figure : float
+        Assumed noise figure of the amplifier being used
+    noise_temp : float
+        Temperature of the amplifier being used in Kelvin
+    passband : List of bandwidths
+        Each bandwidth has structure [bandwidth low, bandwidth high, filter type, order]
+    passband_dipole : List of bandwidths for dipole
+        Same as passband, but for dipole channels if different
+        Only used for future amp_type
+    """
+
+
     noise_temp = 400 * units.kelvin
     noise_figure = 1.4
     passband = []   #Passband elements have structure [freq low, freq high, filter type, order]
@@ -279,11 +303,22 @@ def triggerAndVrmsConditions(amp_type):
         noise_figure = 1
         noise_temp = 350 * units.kelvin
 
-        passband.append([1*units.MHz, 250*units.MHz, 'butter', 10])
-        passband.append([80*units.MHz, 500*units.GHz, 'butter', 5])
+        #2020 design
+#        passband.append([1*units.MHz, 250*units.MHz, 'butter', 10])
+#        passband.append([80*units.MHz, 500*units.GHz, 'butter', 5])
 
-        passband_dipole.append([1*units.MHz, 250*units.MHz, 'cheby1', 9])
-        passband_dipole.append([80*units.MHz, 500*units.GHz, 'cheby1', 4])
+#        passband_dipole.append([1*units.MHz, 250*units.MHz, 'cheby1', 9])
+#        passband_dipole.append([80*units.MHz, 500*units.GHz, 'cheby1', 4])
+
+        #2021 design
+        passband.append([1*units.MHz, 1000*units.MHz, 'butter', 10])    #passband low
+        passband.append([1*units.MHz, 150*units.MHz, 'butter', 10])    #passband low_trigger
+        passband.append([80*units.MHz, 800*units.GHz, 'butter', 5])     #passband high
+
+        passband_dipole.append([1*units.MHz, 1000*units.MHz, 'cheby1', 7])
+        passband_dipole.append([1*units.MHz, 220*units.MHz, 'cheby1', 7])
+        passband_dipole.append([96*units.MHz, 100*units.GHz, 'cheby1', 4])
+
     else:
         #300s case
         noise_figure = 1.4
@@ -417,7 +452,7 @@ dir_LPDA_channels, refl_LPDA_channels, dir_dipole_channels, refl_dipole_channels
 
 
 #Configure temperatures for triggering
-noise_figure, noise_temp, passband, passband_dipole = triggerAndVrmsConditions(amp_type)
+noise_figure, noise_temp, passband, passband_dipole = bandwidthAndVrmsConditions(amp_type)
 
 
 Vrms_per_channel = {}
