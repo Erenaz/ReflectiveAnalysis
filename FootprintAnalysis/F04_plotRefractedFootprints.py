@@ -149,15 +149,18 @@ def getERate(energy, zenith, xs, ys, trigMask, ntrig, nthrow, length, title='', 
 #    maxR = np.sqrt( 2 * (length/2)**2 ) * 1000  #do in m, old for square throw
     maxR = (length/2) * 1000  #do in m, new for circular throw
 #    radBins = np.linspace(0, maxR*1.1, 20)
-    radBins = np.linspace(0, maxR, 2)
+    radBins = np.linspace(0, maxR, 25)
 #    engBins = np.arange(np.log10(np.min(energy)), 20.1, .2)
 #    cosZenBins = np.arange(1, -0.001, -0.05)
-    engBins = np.arange(15.9, 20.5, 0.2)       #Standard Fine Binning
+
+    engBins = np.arange(15.9, 20.5, 0.2)       #My Standard Fine Binning
+#    engBins = np.arange(16.1, 20.5, 0.25)       #Anna's bins
+
 #    engBins = np.arange(15.9, 20.5, 0.5)        #Standard Coarse Binning
 #    engBins = np.arange(15.6, 20.5, 0.5)        #Test Binning of SP
 #    engBins = np.arange(16, 20.1, 0.2)
 
-    cosZenBins = np.arange(1, -0.001, -0.2)
+    cosZenBins = np.arange(1, -0.001, -0.2)         #My bins
 #    cosZenBins = np.flip(np.linspace(0, 1, 7))     #Anna's bins
     zenBins = np.arccos(cosZenBins)
     zenBins[np.isnan(zenBins)] = 0
@@ -168,6 +171,7 @@ def getERate(energy, zenith, xs, ys, trigMask, ntrig, nthrow, length, title='', 
     e_dig = np.digitize(np.log10(energy), engBins) - 1
     z_dig = np.digitize(zenith, zenBins) - 1
     r_dig = np.digitize(rads, radBins)-1
+
 
     trig = np.zeros( (len(engBins)-1, len(zenBins)-1, len(radBins)-1) )
     throw = np.zeros( (len(engBins)-1, len(zenBins)-1, len(radBins)-1) )
@@ -185,6 +189,8 @@ def getERate(energy, zenith, xs, ys, trigMask, ntrig, nthrow, length, title='', 
                 continue
             if zE == len(zenBins)-1:
                 print(f'ze of {zE} in bins {zenBins} from zen {zenith[iE]}')
+            if iR == len(trigMask[0]):
+                continue
 #            throw[nE,zE,r] += 1
 #            trig[nE,zE,r] += int(trigMask[iE,iR])
 #            print(f'r dig {r} corresponding to {rads[iE][iR]}')
@@ -522,8 +528,14 @@ def getERate(energy, zenith, xs, ys, trigMask, ntrig, nthrow, length, title='', 
 #    while not asp == -1:
 #        print(f'give aspect')
 #        asp = float(input())
+        check = False
 
         rrate = np.sum(eRate, axis=1)
+        if check:
+            for iR in range(len(radBins)-1):
+                rrate[:,iR] = iR
+            for iE in range(len(engBins)-1):
+                rrate[iE] *= iE
         print(f'shape rrate {np.shape(rrate)} and len eng {len(engBins)} and rad {len(radBins)}')
         radBins = radBins / 1000
 #        plt.imshow(rrate.T, extent=[min(engBins), max(engBins), max(radBins), min(radBins)], aspect='auto', interpolation='none', norm=matplotlib.colors.LogNorm())
@@ -539,7 +551,14 @@ def getERate(energy, zenith, xs, ys, trigMask, ntrig, nthrow, length, title='', 
 
 
         rate = np.sum(eRate, axis=2)
+        if check:
+            for iZ in range(len(zenBins)-1):
+                rate[:,iZ] = iZ
+            for iE, eng in enumerate(engCenterBins):
+                rate[iE] *= iE
+        rate = np.flip(rate, axis=1)
         zenBins = np.rad2deg(zenBins)
+        print(f'iz go in {zenBins}')
         rate, cmap = set_bad_imshow(rate, 0)
         plt.imshow(rate.T, extent=[min(engBins), max(engBins), max(cosZenBins), min(cosZenBins)], aspect=asp, interpolation='none', cmap=cmap)
 #        plt.imshow(rate.T, extent=[min(engBins), max(engBins), max(cosZenBins), min(cosZenBins)], aspect=asp, interpolation='none', norm=matplotlib.colors.LogNorm())
@@ -578,7 +597,10 @@ def getERate(energy, zenith, xs, ys, trigMask, ntrig, nthrow, length, title='', 
             pErrLow_rate = error_rate_low[:,iZ]
             c = next(color)
 #            plt.plot( (engBins[1:] + engBins[:-1])/2, prate, label=f'{zenBins[iZ]:.1f}-{zenBins[iZ+1]:.1f} deg', linestyle='--', color=c) 
-            plt.fill_between((engBins[1:] + engBins[:-1])/2, pErrLow_rate, pErr_rate, label=f'{zenBins[iZ]:.1f}-{zenBins[iZ+1]:.1f} deg',color=c)
+#            plt.fill_between((engBins[1:] + engBins[:-1])/2, pErrLow_rate, pErr_rate, label=f'{zenBins[iZ]:.1f}-{zenBins[iZ+1]:.1f} deg',color=c)
+            plt.fill_between((engBins[1:] + engBins[:-1])/2, pErr_rate, pErrLow_rate, label=f'{zenBins[iZ]:.1f}-{zenBins[iZ+1]:.1f} deg',color=c)
+        print(f'eng bins orig {engBins}')
+        print(f'fill between eng bins of {(engBins[1:] + engBins[:-1])/2}')
 
         rate = np.sum(rate, axis=1)
         error_rate=np.sum(error_rate, axis=1)
@@ -586,7 +608,8 @@ def getERate(energy, zenith, xs, ys, trigMask, ntrig, nthrow, length, title='', 
 
 
 #        plt.plot( (engBins[1:] + engBins[:-1])/2, rate, label=f'{np.sum(rate):.0f} Evts/Stn/Yr', linestyle='--', color='red') 
-        plt.fill_between((engBins[1:] + engBins[:-1])/2, error_rate_low, error_rate, label=f'{np.sum(rate):.0f} Evts/Stn/Yr', color='red')
+#        plt.fill_between((engBins[1:] + engBins[:-1])/2, error_rate_low, error_rate, label=f'{np.sum(rate):.0f} Evts/Stn/Yr', color='red')
+        plt.fill_between((engBins[1:] + engBins[:-1])/2, error_rate, error_rate_low, label=f'{np.sum(rate):.0f} Evts/Stn/Yr', color='red')
         plt.legend()
         plt.title(title)
         plt.xlabel('Energy (log10eV)')
@@ -604,25 +627,30 @@ def getERate(energy, zenith, xs, ys, trigMask, ntrig, nthrow, length, title='', 
 #        plt.yscale('log')
         plt.show()
 
+        plt.scatter((engBins[1:] + engBins[:-1])/2, error_rate_low, label='low rate')
+        plt.scatter((engBins[1:] + engBins[:-1])/2, error_rate, label='high rate')
+        plt.legend()
+        plt.show()
+
     return eRate
 
 
-
+##################################
+#Start program
+##################################
 
 parser = argparse.ArgumentParser(description='Run file on footprint refraction file')
-#parser.add_argument('file', type=str, default='None', help='file path to analyze')
 parser.add_argument('area', type=float, default=5, help='Length of area thrown over in km, default 5km square')
+parser.add_argument('--lpda_name', type=str, default='3.5sigma', help='Name of trigger type, see F01 for types')
 parser.add_argument('--comment', type=str, default='', help='Title comment to add')
 parser.add_argument('-files', '--list', nargs='+', help='file path to analyze', required=True)
 
 args = parser.parse_args()
-#file = args.file
 files = args.list
+lpda_name = args.lpda_name
 area = args.area
 comment = args.comment
 
-#with open(file, 'rb') as fin:
-#    output = pickle.load(fin)
 
 
 n = []
@@ -651,43 +679,47 @@ for file in files:
     for runid in output:
         print(runid)
 
-    #    if np.log10(output[runid]['energy']) < 17.7:
-    #        continue
 
         n.append(output[runid]['n'])
-#        n_dip_dir.append(output[runid]['n_dip_dir'])
+        n_dip_dir.append(output[runid]['n_dip_dir'])
 #        n_dip_refl.append(output[runid]['n_dip_refl'])
-        n_lpda_refl.append(output[runid]['n_lpda_refl'])
-        n_lpda_dir.append(output[runid]['n_lpda_dir'])
+        n_lpda_refl.append(output[runid][lpda_name]['n_lpda_refl'])
+        n_lpda_dir.append(output[runid][lpda_name]['n_lpda_dir'])
         energy.append(output[runid]['energy'])
         zenith.append(output[runid]['zenith'])
-        azimuth.append(output[runid]['azimuth'])
+#        azimuth.append(output[runid]['azimuth'])               #ADD BACK IN
         x.append(output[runid]['x_dir_lpda'])
         y.append(output[runid]['y_dir_lpda'])
-#        dip_dir_mask.append(output[runid]['dip_dir_mask'])
+        dip_dir_mask.append(output[runid]['dip_dir_mask'])
 #        dip_refl_mask.append(output[runid]['dip_refl_mask'])
-        lpda_dir_mask.append(output[runid]['lpda_dir_mask'])
-        lpda_refl_mask.append(output[runid]['lpda_refl_mask'])
+        lpda_dir_mask.append(output[runid][lpda_name]['lpda_dir_mask'])
+        lpda_refl_mask.append(output[runid][lpda_name]['lpda_refl_mask'])
 #        ant_zen.append(output[runid]['ant_zen'])
 #        dip_dir_SNR.append(output[runid]['dip_dir_SNR'])
 #        dip_refl_SNR.append(output[runid]['dip_refl_SNR'])
-#        lpda_dir_SNR.append(output[runid]['lpda_dir_SNR'])
-#        lpda_refl_SNR.append(output[runid]['lpda_refl_SNR'])
+#        lpda_dir_SNR.append(output[runid][lpda_name]['lpda_dir_SNR'])
+#        lpda_refl_SNR.append(output[runid][lpda_name]['lpda_refl_SNR'])
     fin.close()
 
 n = np.array(n)
-n_dip_dir = np.array(n_dip_dir)
-n_dip_refl = np.array(n_dip_refl)
+#n_dip_dir = np.array(n_dip_dir)
+#n_dip_refl = np.array(n_dip_refl)
 n_lpda_refl = np.array(n_lpda_refl)
 n_lpda_dir = np.array(n_lpda_dir)
 energy = np.array(energy)
 zenith = np.array(zenith)
-azimuth = np.array(azimuth)
+#azimuth = np.array(azimuth)                                    #ADD BACK IN
 #print(f'x is {x}')
 #x = np.array(x, dtype=object)
 #y = np.array(y, dtype=object)
 #x = np.asarray(x)
 #y = np.asarray(y)
+
+if np.any(lpda_dir_mask):
+    print(f'have lpda trig')
+if np.any(lpda_refl_mask):
+    print(f'have lpda refl trig')
+
 print(f'1')
 x = np.array(list(itertools.zip_longest(*x, fillvalue=np.NaN))).T
 print(f'2')
@@ -819,10 +851,10 @@ if True:
 #    print(f'total eRate refl LPDA {np.sum(RLeRate)}')
 #    DDeRate = getERate(energy, zenith, x, y, dip_dir_mask, n_dip_dir, n, area, title='Direct Dipole '+comment)
 #    print(f'total eRate direct dipole {np.sum(DDeRate)}')
-    DLeRate = getERate(energy=energy, zenith=zenith, xs=x, ys=y, trigMask=lpda_dir_mask, ntrig=n_lpda_dir, nthrow=n, length=area, title='Direct LPDA '+comment)
-    print(f'total eRate direct LPDA {np.sum(DLeRate)}')
-#    RDeRate = getERate(energy, zenith, x, y, dip_refl_mask, n_dip_refl, n, area, title='Reflected Dipole '+comment)
-#    print(f'total eRate refl dipole {np.sum(RDeRate)}')
+#    DLeRate = getERate(energy=energy, zenith=zenith, xs=x, ys=y, trigMask=lpda_dir_mask, ntrig=n_lpda_dir, nthrow=n, length=area, title='Direct LPDA '+comment)
+#    print(f'total eRate direct LPDA {np.sum(DLeRate)}')
+    RDeRate = getERate(energy, zenith, x, y, dip_refl_mask, n_dip_refl, n, area, title='Reflected Dipole '+comment)
+    print(f'total eRate refl dipole {np.sum(RDeRate)}')
     quit()
 
     engBins = np.arange(np.log10(np.min(energy)), 20.1, .1)
