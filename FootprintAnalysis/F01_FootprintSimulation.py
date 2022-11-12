@@ -668,7 +668,7 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
                         max_amp = ch_snr['peak_2_peak_amplitude']
                         max_amps.append(max_amp)
                     SNR = max(max_amps)
-                    SNR = SNR / Vrms_per_channel[dir_LPDA_channels[0]]
+#                    SNR = SNR / Vrms_per_channel[dir_LPDA_channels[0]]
                     output[runid][name]['lpda_dir_SNR'].append(SNR)
                     lpda_dir_trig[name] = True
 #                output[runid][name]['lpda_dir_mask'].append(station.has_triggered(trigger_name='dir_LPDA_'+name))
@@ -689,7 +689,7 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
                     max_amp = ch_snr['peak_2_peak_amplitude']
                     max_amps.append(max_amp)
                 SNR = max(max_amps)
-                SNR = SNR / Vrms_per_channel[dir_dipole_channels[0]]
+#                SNR = SNR / Vrms_per_channel[dir_dipole_channels[0]]
                 output[runid]['dip_dir_SNR'].append(SNR)
                 dip_dir_trig = True
 #            output[runid]['dip_dir_mask'].append(station.has_triggered(trigger_name='dipole_2.0sigma_dir'))
@@ -711,7 +711,7 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
                         max_amp = ch_snr['peak_2_peak_amplitude']
                         max_amps.append(max_amp)
                     SNR = max(max_amps)
-                    SNR = SNR / Vrms_per_channel[dir_LPDA_channels[0]]
+#                    SNR = SNR / Vrms_per_channel[dir_LPDA_channels[0]]
                     output[runid][name]['lpda_refl_SNR'].append(SNR)
                     lpda_refl_trig[name] = True
 #                output[runid][name]['lpda_refl_mask'].append(station.has_triggered(trigger_name='LPDA_2of4_3.5sigma'))
@@ -734,7 +734,7 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
                     max_amp = ch_snr['peak_2_peak_amplitude']
                     max_amps.append(max_amp)
                 SNR = max(max_amps)
-                SNR = SNR / Vrms_per_channel[dir_dipole_channels[0]]
+#                SNR = SNR / Vrms_per_channel[dir_dipole_channels[0]]
                 output[runid]['dip_dir_SNR'].append(SNR)
                 dip_dir_trig = True
 #            output[runid]['dip_dir_mask'].append(station.has_triggered(trigger_name='dipole_2.0sigma_dir'))
@@ -754,7 +754,7 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
                     max_amp = ch_snr['peak_2_peak_amplitude']
                     max_amps.append(max_amp)
                 SNR = max(max_amps)
-                SNR = SNR / Vrms_per_channel[refl_dipole_channels[0]]
+#                SNR = SNR / Vrms_per_channel[refl_dipole_channels[0]]
                 output[runid]['dip_refl_SNR'].append(SNR)
                 dip_refl_trig = True
 #            output[runid]['dip_refl_mask'].append(station.has_triggered(trigger_name='dipole_2.0sigma_refl'))
@@ -776,7 +776,7 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
                         max_amp = ch_snr['peak_2_peak_amplitude']
                         max_amps.append(max_amp)
                     SNR = max(max_amps)
-                    SNR = SNR / Vrms_per_channel[refl_LPDA_channels[0]]
+#                    SNR = SNR / Vrms_per_channel[refl_LPDA_channels[0]]
                     output[runid][name]['lpda_refl_SNR'].append(SNR)
                     lpda_refl_trig[name] = True
 #                output[runid][name]['lpda_refl_mask'].append(station.has_triggered(trigger_name='refl_LPDA_'+name))
