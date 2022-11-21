@@ -22,6 +22,7 @@ import NuRadioReco.modules.channelResampler
 import NuRadioReco.modules.io.eventWriter
 import NuRadioReco.modules.trigger.highLowThreshold
 import NuRadioReco.modules.trigger.simpleThreshold
+import NuRadioReco.modules.phasedarray.triggerSimulator
 import NuRadioReco.modules.ARIANNA.hardwareResponseIncorporator
 import NuRadioReco.modules.channelAddCableDelay
 import NuRadioReco.modules.channelLengthAdjuster
@@ -62,6 +63,7 @@ def pullFilesForSimulation(sim_type, min_file, max_file, num_icetop):
         MB: Moore's Bay CoREAS footprints
         SP: South Pole CoREAS footprints
         IceTop: IceCube CoREAS footprints, located in SP
+        GL: Greenland CoREAS footprints
     min_file : float
         Minimum file number of footprints to use.
         SP goes 0-2100
@@ -132,6 +134,18 @@ def pullFilesForSimulation(sim_type, min_file, max_file, num_icetop):
             if os.path.exists(file):
                 input_files.append(file)
             i += 1
+    elif type == 'GL':
+        if max_file == -1:
+            max_file = 600
+        while i < max_file:
+            file = f'../../../../pub/arianna/SIM/greenland/output/SIM{i:06d}.hdf5'
+            if os.path.exists(file):
+                input_files.append(file)
+            i += 1
+
+    else:
+        print(f'Error, type {type} does not exist')
+        quit()
 
     return input_files, attenuation_model
 
@@ -147,6 +161,7 @@ def getDetectorAndTriggersForSim(config, amp_type, depthLayer):
         MB_old: Old Moore's Bay configuration, 4 downward and 4 upward LPDAs
         SP_old: Old South Pole configuration, modeled after Station51
         Stn51:  Stn51 station configuration
+        GL: Future Greenland station configuration
     amp_type: string
         100 or 200: Older amplifier types, used in MB_old
         300: Only used for SP_old
@@ -167,13 +182,15 @@ def getDetectorAndTriggersForSim(config, amp_type, depthLayer):
     """
     lpda_coinc = 2
     dip_sigma = 2
-    if config == 'SP' or config == 'MB_future':
+    PA_sigma = []
+    if config == 'SP' or config == 'MB_future' or config == 'GL':
         if not amp_type == 'future':
             print(f'Future stations only use future, not {amp_type}')
             quit()
         det = generic_detector.GenericDetector(json_filename=f'configurations/gen2_{config}_footprint{depthLayer:.0f}m_infirn.json', assume_inf=False, antenna_by_depth=False, default_station=1)
     #    lpda_sigma = 3.5
         lpda_sigma = [[3.5, '3.5sigma'], [3.9498194908011524, '100Hz'], [4.919151494949084, '10mHz']]
+        PA_sigma = [[30.68, '100Hz'], [38.62, '1Hz'], [50.53, '1mHz']]
     elif config == 'MB_old':
         det = generic_detector.GenericDetector(json_filename=f'configurations/gen2_{config}_{amp_type}s_footprint{depthLayer:.0f}m_infirn.json', assume_inf=False, antenna_by_depth=False, default_station=1)
         lpda_sigma = [[4.4, '4.4sigma']]
@@ -191,7 +208,7 @@ def getDetectorAndTriggersForSim(config, amp_type, depthLayer):
     else:
         print(f'no config of {config} used, use SP, MB_old, or MB_future')
         quit()
-    return det, lpda_sigma, dip_sigma, lpda_coinc
+    return det, lpda_sigma, dip_sigma, PA_sigma, lpda_coinc
 
 def getAntennaChannels(config):
     """
@@ -218,11 +235,15 @@ def getAntennaChannels(config):
         List of channels corresponding to reflected dipole simulation
     """
 
-    if config == 'SP' or config == 'MB_future':
+    dir_PA_channels = []
+    refl_PA_channels = []
+    if config == 'SP' or config == 'MB_future' or config == 'GL':
         dir_LPDA_channels = [0, 1, 2]
         refl_LPDA_channels = [3, 4, 5, 6]
         dir_dipole_channels = [7]
         refl_dipole_channels = [8]
+        dir_PA_channels = [9, 10, 11, 12]
+        refl_PA_channels = [13, 14, 15, 16]
     elif config == 'MB_old':
         dir_LPDA_channels = [0, 1, 2, 3]
         refl_LPDA_channels = [4, 5, 6, 7]
@@ -244,7 +265,7 @@ def getAntennaChannels(config):
         print(f'No config {config} exists, quitting')
         quit()
 
-    return dir_LPDA_channels, refl_LPDA_channels, dir_dipole_channels, refl_dipole_channels
+    return dir_LPDA_channels, refl_LPDA_channels, dir_dipole_channels, refl_dipole_channels, dir_PA_channels, refl_PA_channels
 
 
 
@@ -288,6 +309,7 @@ def bandwidthAndVrmsConditions(amp_type):
     noise_figure = 1.4
     passband = []   #Passband elements have structure [freq low, freq high, filter type, order]
     passband_dipole = []
+    passband_PA = []
 
     if amp_type == '100':
         noise_figure = 1.4
@@ -319,6 +341,11 @@ def bandwidthAndVrmsConditions(amp_type):
         passband_dipole.append([1*units.MHz, 220*units.MHz, 'cheby1', 7])
         passband_dipole.append([96*units.MHz, 100*units.GHz, 'cheby1', 4])
 
+        passband_PA.apend([1*units.MHz, 1000*units.MHz, 'cheby1', 7])
+        passband_PA.apend([1*units.MHz, 220*units.MHz, 'cheby1', 7])
+        passband_PA.apend([96*units.MHz, 100*units.GHz, 'cheby1', 4])
+
+
     else:
         #300s case
         noise_figure = 1.4
@@ -326,7 +353,7 @@ def bandwidthAndVrmsConditions(amp_type):
         passband.append([50*units.MHz, 500*units.GHz, 'butter', 2])
         passband_dipole = passband
 
-    return noise_figure, noise_temp, passband, passband_dipole
+    return noise_figure, noise_temp, passband, passband_dipole, passband_PA
 
 #Parse arguments for simulation
 parser = argparse.ArgumentParser(description='Run CR analysis for specific runids')
@@ -383,7 +410,7 @@ logger.setLevel(logging.WARNING)
 spacing = args.spacing * units.km
 
 #Get Detector and trigger sigmas
-det, lpda_sigma, dip_sigma, lpda_coinc = getDetectorAndTriggersForSim(config, amp_type, depthLayer)
+det, lpda_sigma, dip_sigma, PA_sigma, lpda_coinc = getDetectorAndTriggersForSim(config, amp_type, depthLayer)
 
 
 det.update(datetime.datetime(2018, 10, 1))
@@ -431,6 +458,7 @@ triggerTimeAdjuster = NuRadioReco.modules.triggerTimeAdjuster.triggerTimeAdjuste
 
 simpleThreshold = NuRadioReco.modules.trigger.simpleThreshold.triggerSimulator()
 highLowThreshold = NuRadioReco.modules.trigger.highLowThreshold.triggerSimulator()
+phasedArrayTrigger = NuRadioReco.modules.phasedarray.triggerSimulator.triggerSimulator()
 
 ####
 #For Nur file generation, keep False if not testing it
@@ -448,11 +476,14 @@ mode = {'Channels':True, 'ElectricFields':False, 'SimChannels':False, 'SimElectr
 station_id = 1
 
 #Get channels list for each trigger
-dir_LPDA_channels, refl_LPDA_channels, dir_dipole_channels, refl_dipole_channels = getAntennaChannels(config)
-
+dir_LPDA_channels, refl_LPDA_channels, dir_dipole_channels, refl_dipole_channels, dir_PA_channels, refl_PA_channels = getAntennaChannels(config)
+#Set parameters for Phased array if needed
+main_low_angle = np.deg2rad(-59.54968597864437)
+main_high_angle = np.deg2rad(59.54968597864437)
+phasing_angles_4ant = np.arcsin(np.linspace(np.sin(main_low_angle), np.sin(main_high_angle), 11))
 
 #Configure temperatures for triggering
-noise_figure, noise_temp, passband, passband_dipole = bandwidthAndVrmsConditions(amp_type)
+noise_figure, noise_temp, passband, passband_dipole, passband_PA = bandwidthAndVrmsConditions(amp_type)
 
 
 Vrms_per_channel = {}
@@ -492,6 +523,15 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
             output[runid][name]['lpda_dir_mask'] = []
             output[runid][name]['lpda_dir_SNR'] = []
             output[runid][name]['lpda_refl_SNR'] = []
+        for sigma, name in PA_sigma:
+            output[runid][name] = {}
+            output[runid][name]['n_PA_refl'] = 0
+            output[runid][name]['n_PA_dir'] = 0
+            output[runid][name]['PA_refl_mask'] = []
+            output[runid][name]['PA_dir_mask'] = []
+            output[runid][name]['PA_dir_SNR'] = []
+            output[runid][name]['PA_refl_SNR'] = []
+
         output[runid]['ant_zen'] = []
         logger.warning(f"{runid} starting, cosmic ray with energy {output[runid]['energy']:.2g}eV zenith = {output[runid]['zenith']/units.deg:.0f}deg, azimuth = {output[runid]['azimuth']/units.deg:.0f}deg at location {x}m by {y}m")
         prevrunid = runid
@@ -506,9 +546,14 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
     dip_refl_trig = False
     lpda_refl_trig = {}
     lpda_dir_trig = {}
+    PA_refl_trig = {}
+    PA_dir_trig = {}
     for sigma, name in lpda_sigma:
         lpda_refl_trig[name] = False
         lpda_dir_trig[name] = False
+    for sigma, name in PA_sigma:
+        PA_refl_trig[name] = False
+        PA_dir_trig[name] = False
 
 
 
@@ -549,10 +594,13 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
                             for pb in passband:
                                 filt *= channelBandPassFilter.get_filter(ff, station.get_id(), channel_id, det, passband=[pb[0], pb[1]], filter_type=pb[2], order=pb[3], rp=0.1)
 #                            filt *= channelBandPassFilter.get_filter(ff, station.get_id(), channel_id, det, passband=[passband_low * units.MHz, 5 * units.GHz], filter_type=filter_type, order=order_high, rp=0.1)
-                        if channel_id in dir_dipole_channels or channel_id in refl_dipole_channels:
+                        elif channel_id in dir_dipole_channels or channel_id in refl_dipole_channels:
                             for pb in passband_dipole:
                                 filt *= channelBandPassFilter.get_filter(ff, station.get_id(), channel_id, det, passband=[pb[0], pb[1]], filter_type=pb[2], order=pb[3], rp=0.1)
 #                            filt *= channelBandPassFilter.get_filter(ff, station.get_id(), channel_id, det, passband=[passband_low * units.MHz, 800 * units.GHz], filter_type=dip_filter_type, order=dip_order_high, rp=0.1)
+                        elif channel_id in dir_PA_channels or channel_id in refl_PA_channels:
+                            for pb in passband_PA:
+                                filt *= channelBandPassFilter.get_filter(ff, station.get_id(), channel_id, det, passband=[pb[0], pb[1]], filter_type=pb[2], order=pb[3], rp=0.1)
 
                     bandwidth = np.trapz(np.abs(filt)**2, ff)
 
@@ -579,6 +627,8 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
             lpda_thresh_low = {key: value * -1 for key, value in Vrms_per_channel.items()}
             dip_thresh_high = {key: value for key, value in Vrms_per_channel.items()}
             dip_thresh_low = {key: value * -1 for key, value in Vrms_per_channel.items()}
+            PA_thresh_high = {key: value for key, value in Vrms_per_channel.items()}
+            PA_thresh_low = {key: value * -1 for key, value in Vrms_per_channel.items()}
 
         station.set_station_time(astropy.time.Time('2019-01-01T00:00:00'))
         eventTypeIdentifier.run(evt, station, 'forced', 'cosmic_ray')
@@ -588,6 +638,9 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
         channelLengthAdjuster.run(evt, station, channel_ids=dir_LPDA_channels)
         channelLengthAdjuster.run(evt, station, channel_ids=dir_dipole_channels)
         channelLengthAdjuster.run(evt, station, channel_ids=refl_dipole_channels)
+        if dir_PA_channels:
+            channelLengthAdjuster.run(evt, station, channel_ids=dir_PA_channels)
+            channelLengthAdjuster.run(evt, station, channel_ids=refl_PA_channels)
 
 
         #Because out Dipole is a stand in for a Phased Array, want to multiply signal by 2 relative to noise
@@ -643,6 +696,11 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
                     for pb in passband_dipole:
                         channelBandPassFilter.run(evt, station, det,
                                       passband=[pb[0], pb[1]], filter_type=pb[2], order=pb[3], rp=0.1)
+                elif antenna == 'PA':
+                    for pb in passband_PA:
+                        channelBandPassFilter.run(evt, station, det,
+                                      passband=[pb[0], pb[1]], filter_type=pb[2], order=pb[3], rp=0.1)
+
 
 
         channelSignalReconstructor.run(evt, station, det)
@@ -695,6 +753,7 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
 #            output[runid]['dip_dir_mask'].append(station.has_triggered(trigger_name='dipole_2.0sigma_dir'))
             output[runid]['n_dip_dir'] += int(station.has_triggered(trigger_name='dipole_2.0sigma_dir'))
 
+
             if config == 'Stn51':
                 #For Stn51 sim, use reflected when doing direct for a 3/3 5sigma trigger
                 simpleThreshold.run(evt, station, det,
@@ -720,6 +779,75 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
 
 
         else:
+            #Trigger for direct PA
+            sampling_rate_PA = 2.4? #need to check
+            window_4ant = int(16 * units.ns * sampling_rate_PA * 2.0)
+            step_4ant = int(8 * units.ns * sampling_rate_PA * 2.0)
+            for sigma, name in PA_sigma:
+                Vrms_PA = Vrms_per_channel[dir_PA_channels[0]]
+                phasedArrayTrigger.run(evt, station, det,
+                                   Vrms=Vrms_PA,
+                                   threshold= sigma * np.power(Vrms_PA, 2.0),  # see phased trigger module for explanation
+                                   triggered_channels=dir_PA_channels,
+                                   phasing_angles=phasing_angles_4ant,
+                                   ref_index=1.75,
+                                   trigger_name=f'dir_PA_4channel_{name}',  # the name of the trigger
+                                   trigger_adc=True,  # Don't have a seperate ADC for the trigger
+                                   adc_output=f'voltage',  # output in volts
+                                   trigger_filter=None,
+                                   upsampling_factor=4,
+                                   window=window_4ant,
+                                   step=step_4ant)
+                if station.has_triggered(trigger_name='dir_PA_4channel_'+name):
+                    SNR = 0
+                    max_amps = []
+                    min_amps = []
+                    for channel in dir_PA_channels:
+                        ch_snr = station.get_channel(channel).get_parameter(chp.SNR)
+                        max_amp = ch_snr['peak_2_peak_amplitude']
+                        max_amps.append(max_amp)
+                    SNR = max(max_amps)
+#                    SNR = SNR / Vrms_per_channel[dir_LPDA_channels[0]]
+                    output[runid][name]['PA_dir_SNR'].append(SNR)
+                    lpda_dir_trig[name] = True
+#                output[runid][name]['lpda_dir_mask'].append(station.has_triggered(trigger_name='dir_LPDA_'+name))
+                output[runid][name]['n_PA_dir'] += int(station.has_triggered(trigger_name='dir_PA_4channel_'+name))
+
+        #Trigger for refl PA
+            sampling_rate_PA = 2.4? #need to check
+            window_4ant = int(16 * units.ns * sampling_rate_PA * 2.0)
+            step_4ant = int(8 * units.ns * sampling_rate_PA * 2.0)
+            for sigma, name in PA_sigma:
+                Vrms_PA = Vrms_per_channel[refl_PA_channels[0]]
+                phasedArrayTrigger.run(evt, station, det,
+                                   Vrms=Vrms_PA,
+                                   threshold= sigma * np.power(Vrms_PA, 2.0),  # see phased trigger module for explanation
+                                   triggered_channels=refl_PA_channels,
+                                   phasing_angles=phasing_angles_4ant,
+                                   ref_index=1.75,
+                                   trigger_name=f'refl_PA_4channel_{name}',  # the name of the trigger
+                                   trigger_adc=True,  # Don't have a seperate ADC for the trigger
+                                   adc_output=f'voltage',  # output in volts
+                                   trigger_filter=None,
+                                   upsampling_factor=4,
+                                   window=window_4ant,
+                                   step=step_4ant)
+                if station.has_triggered(trigger_name='refl_PA_4channel_'+name):
+                    SNR = 0
+                    max_amps = []
+                    min_amps = []
+                    for channel in dir_PA_channels:
+                        ch_snr = station.get_channel(channel).get_parameter(chp.SNR)
+                        max_amp = ch_snr['peak_2_peak_amplitude']
+                        max_amps.append(max_amp)
+                    SNR = max(max_amps)
+#                    SNR = SNR / Vrms_per_channel[dir_LPDA_channels[0]]
+                    output[runid][name]['PA_refl_SNR'].append(SNR)
+                    lpda_dir_trig[name] = True
+#                output[runid][name]['lpda_dir_mask'].append(station.has_triggered(trigger_name='dir_LPDA_'+name))
+                output[runid][name]['n_PA_refl'] += int(station.has_triggered(trigger_name='refl_PA_4channel_'+name))
+
+
             # Trigger for direct dipoles
             highLowThreshold.run(evt, station, det,
                                         threshold_high = {key: value * dip_sigma for key, value in dip_thresh_high.items()},
@@ -804,6 +932,9 @@ for evt, iE, x, y in runCoREAS(CoREAS_mode, det, depthLayer, dB, attenuation_mod
         output[runid][name]['lpda_refl_mask'].append(lpda_refl_trig[name])
     output[runid]['dip_dir_mask'].append(dip_dir_trig)
     output[runid]['dip_refl_mask'].append(dip_refl_trig)
+    for sigma, name in PA_sigma:
+        output[runid][name]['PA_dir_mask'].append(PA_dir_trig[name])
+        output[runid][name]['PA_refl_mask'].append(PA_refl_trig[name])
 
 #    for sigma, name in lpda_sigma:
 #        output[runid][name]['n_lpda_refl'] += int(lpda_refl_trig)
